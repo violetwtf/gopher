@@ -19,9 +19,16 @@ const prefix = "!"
 var commands = make(map[string]cmds.Command)
 
 func main() {
-    commands["ping"] = cmds.Ping
-    commands["help"] = cmds.Help
-    commands["ban"]  = cmds.Ban
+    commands["about"] = cmds.About
+    commands["ban"]   = cmds.Ban
+    commands["help"]  = cmds.Help
+    commands["ping"]  = cmds.Ping
+
+    cmds.SetCommandPrefix(prefix)
+    cmds.SetCommandRegistry(commands)
+
+    events.SetCommandPrefix(prefix)
+    events.SetCommandRegistry(commands)
 
     token, err := ioutil.ReadFile("./SUPER_SECRET_TOKEN.txt")
     if err != nil {
