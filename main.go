@@ -6,20 +6,22 @@ import (
     "log"
     "os"
     "os/signal"
-    "strings"
     "syscall"
+
+    cmds "github.com/violetwtf/gopher/commands"
+    "github.com/violetwtf/gopher/events"
 
     "github.com/bwmarrin/discordgo"
 )
 
 const prefix = "!"
 
-var commands = make(map[string]Command)
+var commands = make(map[string]cmds.Command)
 
 func main() {
-    commands["ping"] = CommandPing
-    commands["help"] = CommandHelp
-    commands["ban"]  = CommandBan
+    commands["ping"] = cmds.Ping
+    commands["help"] = cmds.Help
+    commands["ban"]  = cmds.Ban
 
     token, err := ioutil.ReadFile("./SUPER_SECRET_TOKEN.txt")
     if err != nil {
@@ -38,7 +40,7 @@ func main() {
     defer discord.Close()
 
     discord.AddHandler(ready)
-    discord.AddHandler(messageCreate)
+    discord.AddHandler(events.MessageCreate)
 
     // Wait here until CTRL-C or other term signal is received.
     fmt.Println("Gopher is alive! Exit with CTRL-C.")
@@ -53,114 +55,5 @@ func ready(s *discordgo.Session, event *discordgo.Ready) {
     s.UpdateStatus(0, "!help")
 }
 
-func messageCreate(s *discordgo.Session, event *discordgo.MessageCreate) {
-    selfID := s.State.User.ID
-
-    if event.Author.ID == selfID {
-        return
-    }
-
-    msg := event.Message.Content
-
-    if strings.HasPrefix(msg, prefix) {
-        // Get the command
-        parts := strings.Split(msg[1:], " ")
-
-        command, ok := commands[parts[0]]
-
-        args := parts[1:]
-
-        if !ok {
-            return
-        }
-
-        channelID := event.ChannelID
-
-        botPermissions, err := s.State.UserChannelPermissions(
-            selfID, channelID)
-        if err != nil {
-            return
-        }
-
-        requiredBotPerms := command.Requirements.BotPermissions
-
-        if (botPermissions & requiredBotPerms != requiredBotPerms) &&
-            botPermissions != discordgo.PermissionAdministrator {
-            // Bad permissions
-            go s.ChannelMessageSend(channelID, 
-                "Bot doesn't have permission to do this")
-            return
-        }
-
-        userPermissions, err := s.State.UserChannelPermissions(
-            selfID, channelID)
-        if err != nil {
-            return
-        }
-
-        requiredUserPerms := command.Requirements.UserPermissions
-
-        if (userPermissions & requiredUserPerms != requiredUserPerms) && 
-            userPermissions != discordgo.PermissionAdministrator {
-            // Bad USER permissions
-            go s.ChannelMessageSend(channelID,
-                "User doesn't have permission to do this")
-            return
-        }
-
-        requiredArgs := command.Requirements.Args
-        argsCorrect := true
-        argsLen := len(args)
-        requiredArgsLen := len(requiredArgs)
-
-        // argsCheck should be true when the length of args is invalid
-        argsCheck := argsLen != requiredArgsLen
-
-        if command.Requirements.LongText {
-            argsCheck = argsLen < requiredArgsLen
-        }
-
-        if argsCheck {
-            go s.ChannelMessageSend(
-                channelID, 
-                "Invalid usage! Use: ```" + 
-                    prefix + parts[0] + " " + command.GetUsage() + "```")
-            return
-        }
-
-        for i := range requiredArgs {
-            switch requiredArgs[i].Type {
-                case "mention":
-                    arg := args[i]
-
-                    if !strings.HasPrefix(arg, "<@") {
-                        argsCorrect = false
-                        break
-                    }
-
-                    // Check if user exists in guild
-                    userID := arg[3:21]
-
-                    _, err := s.State.Member(event.GuildID, userID)
-
-                    if err != nil {
-                        argsCorrect = false
-                    }
-                    break
-                default:
-            }
-        }
-
-        if !argsCorrect {
-            go s.ChannelMessageSend(
-                channelID, 
-                "Invalid usage! Use: ```" + 
-                    prefix + parts[0] + " " + command.GetUsage() + "```")
-            return
-        }
-
-        go command.Handler(s, event, args)
-    }
-}
 
 
