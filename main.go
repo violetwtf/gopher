@@ -10,6 +10,7 @@ import (
 
     cmds "github.com/violetwtf/gopher/commands"
     "github.com/violetwtf/gopher/events"
+    "github.com/violetwtf/gopher/internal"
 
     "github.com/bwmarrin/discordgo"
 )
@@ -20,9 +21,14 @@ var commands = make(map[string]cmds.Command)
 
 func main() {
     commands["about"] = cmds.About
-    commands["ban"]   = cmds.Ban
     commands["help"]  = cmds.Help
     commands["ping"]  = cmds.Ping
+    
+    commands["kick"] = internal.GetPunishUserCommand(
+        "kick", discordgo.PermissionKickMembers)
+
+    commands["ban"] = internal.GetPunishUserCommand(
+        "ban", discordgo.PermissionBanMembers)
 
     cmds.SetCommandPrefix(prefix)
     cmds.SetCommandRegistry(commands)
@@ -61,6 +67,3 @@ func main() {
 func ready(s *discordgo.Session, event *discordgo.Ready) {
     s.UpdateStatus(0, "!help")
 }
-
-
-
